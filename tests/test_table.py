@@ -9,7 +9,7 @@ import pytest
 
 from messydata.table import concat, dedupe_field_names
 from messydata.util import list_wrapper
-from test.conftest import *
+from tests.conftest import *
 
 
 class MissingRows(Table):

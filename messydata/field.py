@@ -1,8 +1,6 @@
 from enum import Enum
 from weakref import WeakValueDictionary
 
-import six
-
 from messydata.converters import *
 from messydata.operators import Operator
 from messydata.types_ import *
@@ -29,12 +27,9 @@ class DataType(Enum):
         if isinstance(name, DataType):
             return name
         try:
-            return next(dt for dt in DataType if name == name)
+            return DataType(name.lower())
         except StopIteration:
-            raise ValueError(
-                "No data type could be found matching the name {!r}"
-                .format(name)
-            )
+            raise ValueError("No data type could be found matching the name {!r}".format(name))
 
     @property
     def converter(self):  # type: () -> Callable[[bool], Callable[[str], Any]]
