@@ -11,6 +11,9 @@ python-dateutil = "^2.7"
 [tool.poetry.dev-dependencies]
 pytest = "^3.0"
 hypothesis = "^3.82"
+"backports.tempfile" = "^1.0"
+tox = "^3.6"
+pygments = "^2.3"
 
 [build-system]
 requires = ["poetry>=0.12"]

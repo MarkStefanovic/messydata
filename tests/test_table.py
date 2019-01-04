@@ -1,14 +1,13 @@
-import os
-import shutil
-import tempfile
 from collections import OrderedDict
 
-from decimal import Decimal
-
+import os
 import pytest
+import shutil
+from backports.tempfile import TemporaryDirectory
+from decimal import Decimal
+from hypothesis import given
 
 from messydata.table import concat, dedupe_field_names
-from messydata.util import list_wrapper
 from tests.conftest import *
 
 
@@ -22,6 +21,9 @@ def test_aggretation_method():
     assert AggregationMethod.by_name("min").fn == min
     assert "min" == AggregationMethod.Min
     assert "max" == str(AggregationMethod.Max)
+    with pytest.raises(ValueError) as e:
+        AggregationMethod.by_name("Test")
+    assert AggregationMethod.Sum == AggregationMethod.by_name(AggregationMethod.Sum)
 
 
 def test_all():
@@ -29,9 +31,19 @@ def test_all():
         OrderedDict([('id', 4), ('First Name', 'Mark'), ('Last Name', 'Stefanovic')]),
         OrderedDict([('id', 6), ('First Name', 'Mike'), ('Last Name', 'Smith')]),
         OrderedDict([('id', 7), ('First Name', 'Sally'), ('Last Name', 'Jones')]),
-        OrderedDict([('id', 8), ('First Name', 'Mr. X'), ('Last Name', None)])]
-
+        OrderedDict([('id', 8), ('First Name', 'Mr. X'), ('Last Name', None)])
+    ]
     actual = Customer.all()
+    assert expected == actual, "\nACTUAL: {}".format(actual)
+
+
+def test_head():
+    expected = [
+        OrderedDict([('id', 4), ('First Name', 'Mark'), ('Last Name', 'Stefanovic')]),
+        OrderedDict([('id', 6), ('First Name', 'Mike'), ('Last Name', 'Smith')]),
+        OrderedDict([('id', 7), ('First Name', 'Sally'), ('Last Name', 'Jones')])
+    ]
+    actual = Customer.head(3)
     assert expected == actual, "\nACTUAL: {}".format(actual)
 
 
@@ -204,9 +216,8 @@ def test_eomonth():
 
 
 def test_read_write_csv():
-    folder = tempfile.mkdtemp()
-    fp = os.path.join(folder, "tmp.csv")
-    try:
+    with TemporaryDirectory() as folder:
+        fp = os.path.join(folder, "tmp.csv")
         out_fp = Sales.to_csv(fp)
         assert out_fp == fp
         expected = [
@@ -241,8 +252,6 @@ def test_read_write_csv():
         ]
         actual = Sales.from_csv(fp, has_header=True, ignore_errors=True).all()
         assert expected == actual, "\nACTUAL: {}".format(actual)
-    finally:
-        shutil.rmtree(folder)
 
 
 def test_inner_join_unenforced():
@@ -488,6 +497,29 @@ def test_three_way_join():
     assert expected == actual, "\nACTUAL: {}".format(actual)
 
 
+def test_join_invalid_type():
+    with pytest.raises(ValueError) as e:
+        Sales.join(
+            right=Customer,
+            how="abc",
+            left_on=Sales.customer_id,
+            right_on=Customer.id
+        ).all()
+    assert "'abc' is an invalid join type" in str(e.value)
+
+
+def test_join_mismatched_key_fields():
+    with pytest.raises(ValueError) as e:
+        Sales.join(
+            right=Customer,
+            how="inner",
+            left_on=[Sales.id, Sales.customer_id],
+            right_on=Customer.id
+        ).all()
+    assert "The left side of the join has 2 fields to join on but the right side has " \
+           "1 fields." in str(e.value)
+
+
 def test_pivot():
     actual = Sales.join(
         right=Customer,
@@ -545,9 +577,27 @@ def test_sort_rows():
     ]
     actual = [
         (sales["ID"], sales["Amount"])
-        for sales in Sales.sort((Sales.amount, SortDirection.Descending)).all()
+        for sales in Sales.sort(
+            (Sales.amount, SortDirection.Descending),
+            (Sales.id, "asc")
+        ).all()
     ]
     assert expected == actual, "\nACTUAL: {}".format(actual)
+
+
+def test_sort_rows_invalid_direction():
+    with pytest.raises(ValueError) as e:
+        Customer.sort((Customer.first_name, "Test")).all()
+    assert "There is no sort direction named 'Test'." == str(e.value)
+
+
+def test_to_sqlite():
+    with TemporaryDirectory() as folder:
+        db_path = os.path.join(folder, "test.db")
+        Customer.to_sqlite(db_path=db_path, table_name="customer")
+        expected = Customer.all()
+        actual = Customer.from_sqlite(db_path=db_path, table_name="customer").all()
+        assert expected == actual, str(actual)
 
 
 def test_unique():
@@ -595,3 +645,19 @@ def test_where_is_null():
         Sales.customer_id.is_null()
     ).all()
     assert expected == actual, "\nACTUAL: {}".format(actual)
+
+
+@given(rows=example_sales_rows)
+def test_all_method_always_returns_list_of_rows(rows):
+    actual = Sales.from_iterable(rows).all()
+    assert isinstance(actual, list)
+
+
+@given(rows=example_sales_rows)
+def test_all_rows_sortable(rows):
+    actual = Sales.from_iterable(rows).sort(
+        (Sales.sales_date, "asc"),
+        (Sales.customer_id, "asc"),
+        (Sales.amount, "desc")
+    ).all()
+    assert len(actual) == len(rows)

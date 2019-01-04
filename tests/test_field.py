@@ -1,3 +1,5 @@
+import pytest
+
 from messydata.field import Field, CalculatedField
 from messydata.operators import *
 
@@ -40,10 +42,26 @@ def test_calculated_field_multiply():
     assert str(expected) == str(actual), "\nACTUAL: {}".format(actual)
 
 
+def test_data_type_by_name():
+    assert DataType.String == DataType.by_name("str")
+    with pytest.raises(ValueError) as e:
+        DataType.by_name("test")
+    assert "is not a valid DataType" in str(e.value)
+
+
 def test_calculated_field_lookup():
     calc = CalculatedField(display_name="Full Name",
                            expression=Customer.first_name + Customer.last_name)
     assert calc == calculated_fields["Full Name"]
+
+
+def test_field_contains():
+    expected = [
+        OrderedDict([('id', 4), ('First Name', 'Mark'), ('Last Name', 'Stefanovic')]),
+        OrderedDict([('id', 6), ('First Name', 'Mike'), ('Last Name', 'Smith')])
+    ]
+    actual = Customer.where(Customer.last_name.contains("t")).all()
+    assert expected == actual, "\nACTUAL: {}".format(actual)
 
 
 def test_data_type_converter():
@@ -72,6 +90,14 @@ def test_field_eq():
 
     assert Customer.first_name == Customer.first_name
     assert Sales.id != Customer.id
+
+
+def test_field_endswith():
+    expected = [
+        OrderedDict([('id', 4), ('First Name', 'Mark'), ('Last Name', 'Stefanovic')])
+    ]
+    actual = Customer.where(Customer.first_name.endswith("k")).all()
+    assert expected == actual, "\nACTUAL: {}".format(actual)
 
 
 def test_field_repr():

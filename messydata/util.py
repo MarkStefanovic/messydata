@@ -5,8 +5,12 @@ from dateutil.parser import parse
 from messydata.types_ import *
 
 __all__ = (
-    "bomonth", "eomonth", "is_iterable", "list_wrapper", "tuple_wrapper",
-    "unwrap_to_list"
+    "bomonth",
+    "eomonth",
+    "is_iterable",
+    "list_wrapper",
+    "tuple_wrapper",
+    "unwrap_to_list",
 )
 
 T = TypeVar("T")
@@ -54,27 +58,25 @@ def unwrap_to_list(*values):  # type: (Union[T, Sequence[T]]) -> List[T]
 
 def end_of_current_month(
     dtime  # type: datetime.date
-):         # type: (...) -> Optional[datetime.date]
+):  # type: (...) -> Optional[datetime.date]
     last_day_of_month = monthrange(dtime.year, dtime.month)[1]
     eom = datetime.date(dtime.year, dtime.month, last_day_of_month)
     return eom
 
 
-def first_day_of_next_month(dtime):   # type: (datetime.date) -> Optional[datetime.date]
+def first_day_of_next_month(dtime):  # type: (datetime.date) -> Optional[datetime.date]
     eom = end_of_current_month(dtime)
     next_day = datetime.timedelta(days=1)
     return eom + next_day
 
 
-def end_of_next_month(dtime):   # type: (datetime.date) -> Optional[datetime.date]
+def end_of_next_month(dtime):  # type: (datetime.date) -> Optional[datetime.date]
     dtime = first_day_of_next_month(dtime)
     eom = end_of_current_month(dtime)
     return eom
 
 
-def end_of_prior_month(dtime):   # type: (datetime.date) -> Optional[datetime.date]
-    if dtime is None:
-        return
+def end_of_prior_month(dtime):  # type: (datetime.date) -> Optional[datetime.date]
     days_in_month = dtime.day
     offset = datetime.timedelta(days=-days_in_month)
     eom = dtime + offset
@@ -82,9 +84,9 @@ def end_of_prior_month(dtime):   # type: (datetime.date) -> Optional[datetime.da
 
 
 def eomonth(
-    start_date,      # type: Union[datetime.date, datetime.datetime],
-    months_offset=0  # type: int
-):                   # type: (...) -> Optional[datetime.date]
+    start_date,  # type: Union[datetime.date, datetime.datetime],
+    months_offset=0,  # type: int
+):  # type: (...) -> Optional[datetime.date]
     """Get the end of the month x months before or after.
 
     The functionality is modeled after the Excel function of
@@ -99,7 +101,9 @@ def eomonth(
     elif isinstance(start_date, six.string_types):
         dt = parse(start_date).date()
     else:
-        raise ValueError("The value {!r} cannot be interpreted as a date.".format(start_date))
+        raise ValueError(
+            "The value {!r} cannot be interpreted as a date.".format(start_date)
+        )
 
     if months_offset == 0:
         eom = end_of_current_month(dt)
@@ -116,10 +120,8 @@ def eomonth(
     return eom
 
 
-def bomonth(
-    dt,              # type: Union[datetime.date, datetime.datetime]
-    months_offset=0  # type: int
-):                   # type: (...) -> Optional[Union[datetime.date, datetime.datetime]]
+def bomonth(dt, months_offset=0):
+    # type: (Union[datetime.date, datetime.datetime], int) -> Optional[Union[datetime.date, datetime.datetime]]
     if dt is None:
         return
     eom = eomonth(dt, months_offset - 1)

@@ -5,7 +5,7 @@ from operator import and_, eq, ge, gt, le, lt, ne, or_
 
 import six
 
-from messydata.converters import upcast
+from messydata.converters import upcast_values
 from messydata.types_ import *
 
 
@@ -31,24 +31,6 @@ class Operator(Enum):
     Subtract = " - "
 
     @property
-    def comparison_operators(self):
-        return {
-            Operator.Add: False,
-            Operator.And: False,
-            Operator.Divide: False,
-            Operator.Equals: True,
-            Operator.GreaterThan: True,
-            Operator.GreaterThanOrEquals: True,
-            Operator.LessThan: True,
-            Operator.LessThanOrEquals: True,
-            Operator.Multiply: False,
-            Operator.Negate: False,
-            Operator.NotEquals: True,
-            Operator.Or: False,
-            Operator.Subtract: False
-        }[self]
-
-    @property
     def type(self):
         return {
             Operator.Add: "binary",
@@ -63,7 +45,7 @@ class Operator(Enum):
             Operator.Negate: "unary",
             Operator.NotEquals: "binary",
             Operator.Or: "binary",
-            Operator.Subtract: "binary"
+            Operator.Subtract: "binary",
         }[self]
 
     @property
@@ -81,7 +63,7 @@ class Operator(Enum):
             Operator.Negate: negate_field,
             Operator.NotEquals: fields_are_not_equal,
             Operator.Or: or_,
-            Operator.Subtract: subtract_fields
+            Operator.Subtract: subtract_fields,
         }[self]
 
     @property
@@ -122,10 +104,8 @@ def add_fields(left, right):  # type: (Primitive, Primitive) -> Primitive
                 raise ValueError("Cannot add {!r} to a date".format(left))
         elif isinstance(left, six.string_types):
             return left + str(right)
-            # return left + " " + str(right)
         elif isinstance(right, six.string_types):
             return str(left) + right
-            # return str(left) + " " + right
         elif isinstance(left, (float, int, Decimal)):
             return left + type(left)(right)
         elif isinstance(right, (float, int, Decimal)):
@@ -141,7 +121,7 @@ def add_fields(left, right):  # type: (Primitive, Primitive) -> Primitive
 def divide_fields(left, right):  # type: (Primitive, Primitive) -> Primitive
     if left and right:
         if is_numeric(left) and is_numeric(right):
-            return left/type(left)(right)
+            return left / type(left)(right)
         raise ValueError("Cannot divide {!r} from {!r}".format(left, right))
     elif left:
         if is_numeric(left):
@@ -153,12 +133,8 @@ def divide_fields(left, right):  # type: (Primitive, Primitive) -> Primitive
         raise ValueError("{!r} is not a valid value for division".format(right))
 
 
-def equals(
-    left,      # type: Primitive
-    right,     # type: Primitive
-    or_equals  # type: bool
-):             # type: (...) -> bool
-    left, right = upcast(left, right)
+def equals(left, right, or_equals):  # type: (Primitive, Primitive, bool) -> bool
+    left, right = upcast_values(left, right)
     if or_equals:
         op = eq
     else:
@@ -174,41 +150,37 @@ def equals(
 
 
 def field_greater_than(left, right):  # type: (Primitive, Primitive) -> bool
-    left, right = upcast(left, right)
+    left, right = upcast_values(left, right)
     return greater_than(left, right, or_equals=False)
 
 
 def field_greater_than_or_equals(left, right):  # type: (Primitive, Primitive) -> bool
-    left, right = upcast(left, right)
+    left, right = upcast_values(left, right)
     return greater_than(left, right, or_equals=True)
 
 
 def field_less_than(left, right):  # type: (Primitive, Primitive) -> bool
-    left, right = upcast(left, right)
+    left, right = upcast_values(left, right)
     return less_than(left, right, or_equals=False)
 
 
 def field_less_than_or_equals(left, right):  # type: (Primitive, Primitive) -> bool
-    left, right = upcast(left, right)
+    left, right = upcast_values(left, right)
     return less_than(left, right, or_equals=True)
 
 
 def fields_are_equal(left, right):  # type: (Primitive, Primitive) -> bool
-    left, right = upcast(left, right)
+    left, right = upcast_values(left, right)
     return equals(left, right, or_equals=True)
 
 
 def fields_are_not_equal(left, right):  # type: (Primitive, Primitive) -> bool
-    left, right = upcast(left, right)
-    return equals(left, right, or_equals=True)
+    left, right = upcast_values(left, right)
+    return equals(left, right, or_equals=False)
 
 
-def greater_than(
-    left,      # type: Primitive
-    right,     # type: Primitive
-    or_equals  # type: bool
-):             # type: (...) -> bool
-    left, right = upcast(left, right)
+def greater_than(left, right, or_equals):  # type: (Primitive, Primitive, bool) -> bool
+    left, right = upcast_values(left, right)
     if or_equals:
         op = ge
     else:
@@ -223,12 +195,8 @@ def greater_than(
         return True
 
 
-def less_than(
-    left,      # type: Primitive
-    right,     # type: Primitive
-    or_equals  # type: bool
-):             # type: (...) -> bool
-    left, right = upcast(left, right)
+def less_than(left, right, or_equals):  # type: (Primitive, Primitive, bool) -> bool
+    left, right = upcast_values(left, right)
     if or_equals:
         op = le
     else:
@@ -281,21 +249,14 @@ def subtract_fields(left, right):  # type: (Primitive, Primitive) -> Primitive
                 return left - right
             else:
                 raise ValueError("Cannot subtract {!r} from a date".format(right))
-        elif isinstance(right, (datetime.date, datetime.datetime)):
-            if isinstance(left, (float, int)):
-                return right - datetime.timedelta(days=left)
-            elif isinstance(left, datetime.timedelta):
-                return right - left
-            else:
-                raise ValueError("Cannot subtract {!r} from a date".format(left))
-        elif isinstance(left, (float, int, Decimal)):
+        elif type(left) == type(right) and is_numeric(left):
+            return left - right
+        elif is_numeric(left) and is_numeric(right):
             return left - type(left)(right)
-        elif isinstance(right, (float, int, Decimal)):
-            return type(right)(left) - right
         else:  # strings
             raise ValueError("Cannot subtract {!r} from {!r}".format(left, right))
     elif left:
-            return left
+        return left
     else:
         if isinstance(right, (bool, Decimal, float, int)):
             return -right

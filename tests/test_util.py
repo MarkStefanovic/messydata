@@ -56,6 +56,11 @@ def test_eomonth(dummy_date):
     assert eomonth(dummy_date, 1) == datetime.date(2010, 8, 31)
     assert eomonth(dummy_date, 2) == datetime.date(2010, 9, 30)
     assert eomonth(None, 1) is None
+    assert eomonth(datetime.date(2010, 1, 15), 1) == datetime.date(2010, 2, 28)
+    assert eomonth("2010-1-15 02:25:51.771550", 1) == datetime.date(2010, 2, 28)
+    with pytest.raises(ValueError) as e:
+        eomonth(4, 3)
+    assert "The value 4 cannot be interpreted as a date." == str(e.value)
 
 
 def test_bomonth(dummy_date):

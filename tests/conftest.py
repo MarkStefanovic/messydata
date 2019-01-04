@@ -1,7 +1,15 @@
 import datetime
 
+from hypothesis import strategies as st
+from hypothesis.strategies import composite
+
 from messydata.table import *
 from messydata.field import *
+
+any_primitive = st.one_of(st.none(), st.booleans(), st.integers(), st.floats(), st.text(), st.dates(), st.datetimes())
+integer_st = st.integers(min_value=-999999, max_value=999999)
+decimal_st = st.decimals(allow_nan=False, allow_infinity=False, min_value=-999999, max_value=999999)
+primitive_st = st.sampled_from([integer_st, st.floats(), st.text(), st.booleans()])
 
 
 class Sales(Table):
@@ -60,3 +68,17 @@ class Inventory(Table):
             Inventory(id=3, name=u"Cupcake", cost=0.99)
         )
 
+
+@composite
+def example_sales_row(draw):
+    return Sales(
+        id=draw(integer_st),
+        customer_id=draw(integer_st),
+        item_id=draw(integer_st),
+        sales_date=draw(st.dates()),
+        amount=draw(decimal_st),
+        payment_due=draw(st.dates())
+    )
+
+
+example_sales_rows = st.lists(example_sales_row(), max_size=5)

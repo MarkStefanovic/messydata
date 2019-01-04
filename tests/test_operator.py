@@ -1,6 +1,34 @@
 import pytest
 
 from messydata.operators import *
+from hypothesis import given, reproduce_failure, example, assume
+from hypothesis import strategies as st
+
+from tests.conftest import any_primitive, primitive_st, Sales, example_sales_rows
+
+
+@pytest.mark.parametrize(
+    "left, right, or_equals, expected", [
+        (True, True, True, True),
+        (True, False, True, False),
+        (1.0, 1, True, True),
+        (1.0, -1, True, False),
+        (1.0, -1, False, True)
+    ]
+)
+def test_equals(left, right, or_equals, expected):
+    actual = equals(left=left, right=right, or_equals=or_equals)
+    assert expected == actual
+
+
+@given(
+    data=st.data(),
+    primitive_st=primitive_st,
+)
+def test_equals_for_same_type_always_returns_bool(data, primitive_st):
+    left = data.draw(primitive_st)
+    right = data.draw(primitive_st)
+    assert isinstance(equals(left=left, right=right, or_equals=False), bool)
 
 
 def test_operator_eq():
@@ -118,6 +146,8 @@ def test_safe_negate(val, expected):
         (datetime.datetime(2010, 1, 1), 1.4, datetime.datetime(2009, 12, 30, 14, 24)),
         (datetime.date(2010, 1, 1), datetime.timedelta(days=3), datetime.date(2009, 12, 29)),
         (datetime.datetime(2010, 1, 1), datetime.timedelta(days=3), datetime.datetime(2009, 12, 29)),
+        (1, 1.0, 0),
+        (1, 1, 0)
     ]
 )
 def test_safe_subtract(left, right, expected):
@@ -138,3 +168,105 @@ def test_safe_subtract(left, right, expected):
 )
 def test_is_numeric(val, expected):
     assert is_numeric(val) is expected
+
+
+@given(any_primitive)
+def test_is_numeric_always_returns_bool(v):
+    assert isinstance(is_numeric(v), bool)
+
+
+def test_operator_repr():
+    assert "Operator.Add" == repr(Operator.Add)
+
+
+@given(rows=example_sales_rows)
+def test_field_greater_than(rows):
+    assume(len(rows) > 0)
+    actual = Sales.from_iterable(rows).where(Sales.amount > 100).all()
+    assert all(r["Amount"] > Decimal(100) for r in actual)
+
+
+@given(rows=example_sales_rows)
+def test_field_greater_than_or_equal_to(rows):
+    assume(len(rows) > 0)
+    actual = Sales.from_iterable(rows).where(Sales.amount >= 100).all()
+    assert all(r["Amount"] >= Decimal(100) for r in actual)
+
+
+@given(rows=example_sales_rows)
+def test_field_less_than(rows):
+    assume(len(rows) > 0)
+    actual = Sales.from_iterable(rows).where(Sales.amount < 100).all()
+    assert all(r["Amount"] < 100 for r in actual), str(actual)
+
+
+@given(rows=example_sales_rows)
+def test_field_less_than_or_equals(rows):
+    assume(len(rows) > 0)
+    actual = Sales.from_iterable(rows).where(Sales.amount <= 100).all()
+    assert all(r["Amount"] <= 100 for r in actual), str(actual)
+
+
+def test_fields_are_not_equal():
+    actual = Sales.from_iterable([
+        Sales(
+            id=1,
+            customer_id=1,
+            item_id=1,
+            sales_date=datetime.date(2018, 11, 1),
+            amount=100,
+            payment_due=datetime.date(2018, 11, 1)
+        ),
+        Sales(
+            id=2,
+            customer_id=1,
+            item_id=1,
+            sales_date=datetime.date(2018, 12, 1),
+            amount=200,
+            payment_due=datetime.date(2018, 12, 1)
+        ),
+        Sales(
+            id=2,
+            customer_id=1,
+            item_id=1,
+            sales_date=datetime.date(2018, 12, 1),
+            amount=100,
+            payment_due=datetime.date(2018, 12, 1)
+        )
+    ]).where(Sales.amount != 100).all()
+    expected = [
+        OrderedDict([
+            ('ID', 2), ('Customer ID', 1), ('Item ID', 1),
+            ('Sales Date', datetime.datetime(2018, 12, 1, 0, 0)),
+            ('Amount', Decimal('200.00')),
+            ('Payment Due', datetime.datetime(2018, 12, 1, 0, 0))
+        ])
+    ]
+    assert expected == actual, str(actual)
+
+
+def test_multiply_fields_non_numeric_inputs():
+    with pytest.raises(ValueError) as e:
+        multiply_fields("abc", 123)
+    assert "Cannot multiply 'abc' by 123" in str(e.value)
+
+    with pytest.raises(ValueError) as e:
+        multiply_fields(123, "abc")
+    assert "Cannot multiply 123.0 by 'abc'" in str(e.value)
+
+
+def test_negate_field_invalid_input():
+    with pytest.raises(ValueError) as e:
+        negate_field("abc")
+    assert "'abc' is not a valid value for negation" in str(e.value)
+
+
+def test_subtract_fields_invalid_input():
+    with pytest.raises(ValueError) as e:
+        subtract_fields(datetime.date(2010, 12, 31), "abc")
+    assert "Cannot subtract 'abc' from a date" in str(e.value)
+
+    with pytest.raises(ValueError) as e:
+        subtract_fields("abc", 1)
+    assert "Cannot subtract 'abc' from 1" in str(e.value)
+

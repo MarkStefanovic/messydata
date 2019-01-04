@@ -7,8 +7,14 @@ from messydata.types_ import *
 from messydata.util import unwrap_to_list, eomonth, bomonth
 
 __all__ = (
-    "calculated_fields", "CurrencyField", "DateField", "FloatField",
-    "IntField", "StringField", "DataType", "Expression"
+    "calculated_fields",
+    "CurrencyField",
+    "DataType",
+    "DateField",
+    "Expression",
+    "FloatField",
+    "IntField",
+    "StringField",
 )
 
 
@@ -26,10 +32,7 @@ class DataType(Enum):
         """Given a string, return a matching DataType if one exists"""
         if isinstance(name, DataType):
             return name
-        try:
-            return DataType(name.lower())
-        except StopIteration:
-            raise ValueError("No data type could be found matching the name {!r}".format(name))
+        return DataType(name.lower())
 
     @property
     def converter(self):  # type: () -> Callable[[bool], Callable[[str], Any]]
@@ -40,7 +43,7 @@ class DataType(Enum):
             DataType.DateTime: try_datetime,
             DataType.Float: try_float,
             DataType.Int: try_int,
-            DataType.String: try_str
+            DataType.String: try_str,
         }[self]
 
     @property
@@ -52,7 +55,7 @@ class DataType(Enum):
             DataType.DateTime: datetime.datetime.min,
             DataType.Float: 0.0,
             DataType.Int: 0,
-            DataType.String: ""
+            DataType.String: "",
         }[self]
 
     @property
@@ -64,7 +67,7 @@ class DataType(Enum):
             DataType.DateTime: False,
             DataType.Float: True,
             DataType.Int: True,
-            DataType.String: False
+            DataType.String: False,
         }[self]
 
     @property
@@ -77,7 +80,7 @@ class DataType(Enum):
             DataType.DateTime: noop,
             DataType.Float: noop,
             DataType.Int: lambda v: int(v) if v else None,
-            DataType.String: noop
+            DataType.String: noop,
         }[self]
 
     @property
@@ -89,7 +92,7 @@ class DataType(Enum):
             DataType.DateTime: "TIMESTAMP",
             DataType.Float: "REAL",
             DataType.Int: "INTEGER",
-            DataType.String: "TEXT"
+            DataType.String: "TEXT",
         }[self]
 
     def __eq__(self, other):
@@ -110,9 +113,9 @@ class Expression(object):
 
     def __init__(
         self,
-        operator,      # type: Operator
-        operand1,      # type: Union[Field, ExpressionWrapper]
-        operand2=None  # type: Optional[Union[Field, ExpressionWrapper]]
+        operator,  # type: Operator
+        operand1,  # type: Union[Field, ExpressionWrapper]
+        operand2=None,  # type: Optional[Union[Field, ExpressionWrapper]]
     ):
         self.operator = operator
         self.operand1 = operand1
@@ -133,8 +136,7 @@ class Expression(object):
 
         if self.operator.type == "binary":
             return self.operator.fn(
-                unwrap_field_value(row, left),
-                unwrap_field_value(row, right)
+                unwrap_field_value(row, left), unwrap_field_value(row, right)
             )
         elif self.operator.type == "unary":
             return self.operator.fn(unwrap_field_value(row, left))
@@ -211,10 +213,10 @@ class ExpressionWrapper(object):
         return Expression(Operator.Multiply, other, self)
 
     def __le__(self, other):
-        return Expression(Operator.LessThan, other, self)
+        return Expression(Operator.LessThanOrEquals, self, other)
 
     def __lt__(self, other):
-        return Expression(Operator.LessThanOrEquals, self, other)
+        return Expression(Operator.LessThan, self, other)
 
     def __ne__(self, other):
         return Expression(Operator.NotEquals, self, other)
@@ -225,17 +227,21 @@ class ExpressionWrapper(object):
 
 class Field(ExpressionWrapper):
     __slots__ = (
-        "data_type", "description", "display_name", "table_name", "name",
-        "_creation_order"
+        "data_type",
+        "description",
+        "display_name",
+        "table_name",
+        "name",
+        "_creation_order",
     )
 
     counter = 0
 
     def __init__(
         self,
-        display_name,   # type: FieldName
-        data_type,      # type: Union[str, DataType]
-        description=""  # type: str
+        display_name,  # type: FieldName
+        data_type,  # type: Union[str, DataType]
+        description="",  # type: str
     ):
         """descriptor containing metadata for a field"""
 
@@ -260,9 +266,9 @@ class Field(ExpressionWrapper):
 
     def map(
         self,
-        values,       # type: Dict[Primitive, Primitive]
-        default=None  # type: Primitive
-    ):                # type: (...) -> DeferredRowValue
+        values,  # type: Dict[Primitive, Primitive]
+        default=None,  # type: Primitive
+    ):  # type: (...) -> DeferredRowValue
         def mapper(row):  # type: (Row) -> Primitive
             val = row[(self.table_name, self.name)]
             return values.get(val, default)
@@ -270,7 +276,7 @@ class Field(ExpressionWrapper):
         return DeferredRowValue(
             expression=mapper,
             data_type=self.data_type,
-            description="{}.map(values={})".format(self.full_name, values)
+            description="{}.map(values={})".format(self.full_name, values),
         )
 
     def is_null(self, or_blank=False):  # type: (bool) -> DeferredRowValue
@@ -283,7 +289,7 @@ class Field(ExpressionWrapper):
         return DeferredRowValue(
             expression=expression,
             data_type=DataType.Boolean,
-            description="{}.is_null(or_blank={})".format(self.name, or_blank)
+            description="{}.is_null(or_blank={})".format(self.name, or_blank),
         )
 
     def __repr__(self):  # type: () -> str
@@ -295,7 +301,7 @@ class Field(ExpressionWrapper):
             display_name=self.display_name,
             data_type=self.data_type,
             description=self.description,
-            dataframe=self.table_name
+            dataframe=self.table_name,
         )
 
     def __str__(self):  # type: () -> str
@@ -307,13 +313,14 @@ class DeferredRowValue(ExpressionWrapper):
     The main difference between a DeferredRowValue and a CalculatedField is that
     a DeferredRowValue is not named, and is not persisted.
     """
+
     __slots__ = ("expression", "data_type", "description")
 
     def __init__(
         self,
-        expression,     # type: Expression
-        data_type,      # type: DataType
-        description=""  # type: str
+        expression,  # type: Expression
+        data_type,  # type: DataType
+        description="",  # type: str
     ):
         super(DeferredRowValue, self).__init__()
 
@@ -325,9 +332,8 @@ class DeferredRowValue(ExpressionWrapper):
         return self.expression(row)
 
     def __repr__(self):
-        return (
-            "DeferredRowValue(row_fn=lambda row:..., description={!r})"
-            .format(self.description)
+        return "DeferredRowValue(row_fn=lambda row:..., description={!r})".format(
+            self.description
         )
 
     def __str__(self):
@@ -339,35 +345,32 @@ calculated_fields = WeakValueDictionary()  # type: Dict[FieldName, "CalculatedFi
 
 class CalculatedField(Field):
     """Reusable row expression"""
+
     def __init__(
         self,
-        display_name,      # type: FieldName
-        expression,        # type: ExpressionWrapper
-        description="",    # type: str
-        data_type="infer"  # type: DataType
+        display_name,  # type: FieldName
+        expression,  # type: ExpressionWrapper
+        description="",  # type: str
+        data_type="infer",  # type: DataType
     ):
         if isinstance(expression, Expression):
             if data_type == "infer":
-                if len(set(fld.data_type for fld in expression.fields)) == 1:
-                    data_type = expression.fields[0].data_type
-                elif all(fld.data_type.is_numeric for fld in expression.fields):
-                    data_type = DataType.Float
-                else:
-                    data_type = DataType.String
+                dtypes = list(set(fld.data_type for fld in expression.fields))
+                data_type = coalesce_types(dtypes)
         elif isinstance(expression, DeferredRowValue):
             if data_type == "infer":
                 data_type = expression.data_type
             expression = expression.expression
         else:
             if data_type == "infer":
-                raise ValueError("The data_type of a lambda cannot be inferred.  Please specify.")
+                raise ValueError(
+                    "The data_type of a lambda cannot be inferred.  Please specify."
+                )
 
         self._expression = expression
 
         super(CalculatedField, self).__init__(
-            display_name=display_name,
-            data_type=data_type,
-            description=description
+            display_name=display_name, data_type=data_type, description=description
         )
 
         self.name = display_name.replace(" ", "_").lower()
@@ -388,36 +391,32 @@ class CalculatedField(Field):
 
 
 class CurrencyField(Field):
-    def __init__(
-        self,
-        display_name,   # type: str
-        description=""  # type: str
-    ):
+    def __init__(self, display_name, description=""):  # type: (str, str) -> None
         super(CurrencyField, self).__init__(
             display_name=display_name,
             data_type=DataType.Currency,
-            description=description
+            description=description,
         )
 
 
 class DateField(Field):
     def __init__(
         self,
-        display_name,    # type: str
+        display_name,  # type: str
         description="",  # type: str
-        and_time=True    # type: bool
+        and_time=True,  # type: bool
     ):
         if and_time:
             super(DateField, self).__init__(
                 display_name=display_name,
                 data_type=DataType.DateTime,
-                description=description
+                description=description,
             )
         else:
             super(DateField, self).__init__(
                 display_name=display_name,
                 data_type=DataType.Date,
-                description=description
+                description=description,
             )
 
     def bomonth(self, months=0):  # type: (int) -> DeferredRowValue
@@ -429,7 +428,7 @@ class DateField(Field):
         return DeferredRowValue(
             expression=expression,
             data_type=DataType.Date,
-            description="{}.eomonth(months={})".format(self.full_name, months)
+            description="{}.eomonth(months={})".format(self.full_name, months),
         )
 
     def eomonth(self, months=0):  # type: (int) -> DeferredRowValue
@@ -441,45 +440,35 @@ class DateField(Field):
         return DeferredRowValue(
             expression=expression,
             data_type=DataType.Date,
-            description="{}.eomonth(months={})".format(self.full_name, months)
+            description="{}.eomonth(months={})".format(self.full_name, months),
         )
 
 
 class FloatField(Field):
     def __init__(self, display_name, description=""):
         super(FloatField, self).__init__(
-            display_name=display_name,
-            data_type=DataType.Float,
-            description=description
+            display_name=display_name, data_type=DataType.Float, description=description
         )
 
 
 class IntField(Field):
     def __init__(self, display_name, description=""):
         super(IntField, self).__init__(
-            display_name=display_name,
-            data_type=DataType.Int,
-            description=description
+            display_name=display_name, data_type=DataType.Int, description=description
         )
 
 
 class StringField(Field):
-    def __init__(
-        self,
-        display_name,         # type: str
-        description=""        # type: str
-    ):
+    def __init__(self, display_name, description=""):  # type: (str, str) -> None
         super(StringField, self).__init__(
             display_name=display_name,
             data_type=DataType.String,
-            description=description
+            description=description,
         )
 
     def contains(
-        self,
-        fragment,          # type: str
-        ignore_case=False  # type: bool
-    ):                     # type: (...) -> DeferredRowValue
+        self, fragment, ignore_case=False
+    ):  # type: (str, bool) -> DeferredRowValue
         fragment = str(fragment or "")
 
         def expression(row):  # type: (Row) -> bool
@@ -494,17 +483,15 @@ class StringField(Field):
             expression=expression,
             data_type=DataType.Boolean,
             description=(
-                "{}.contains(fragment={!r}, ignore_case={})"
-                .format(self.full_name, fragment, ignore_case)
-            )
+                "{}.contains(fragment={!r}, ignore_case={})".format(
+                    self.full_name, fragment, ignore_case
+                )
+            ),
         )
 
     def endswith(
-        self,
-        suffix,            # type: str
-        ignore_case=False  # type: bool
-    ):                     # type: (...) -> DeferredRowValue
-
+        self, suffix, ignore_case=False
+    ):  # type: (str, bool) -> DeferredRowValue
         def expression(row):  # type: (Row) -> bool
             val = row[(self.table_name, self.name)] or ""
             if ignore_case:
@@ -515,20 +502,18 @@ class StringField(Field):
             expression=expression,
             data_type=DataType.String,
             description=(
-                "{}.endswith(suffix={!r}, ignore_case={})"
-                .format(self.full_name, suffix, ignore_case)
-            )
+                "{}.endswith(suffix={!r}, ignore_case={})".format(
+                    self.full_name, suffix, ignore_case
+                )
+            ),
         )
 
     def matches_regex(self, regex):  # type: (str) -> DeferredRowValue
         pass
 
     def replace(
-        self,
-        fragment,      # type: str
-        replacement    # type: str
-    ):                 # type: (...) -> DeferredRowValue
-
+        self, fragment, replacement
+    ):  # type: (str, str) -> DeferredRowValue
         def expression(row):  # type: (Row) -> Primitive
             val = row[(self.table_name, self.name)] or ""
             return str(val).replace(fragment, replacement)
@@ -537,17 +522,15 @@ class StringField(Field):
             expression=expression,
             data_type=DataType.String,
             description=(
-                "{}.replace(fragment={!r}, replacement={!r})"
-                .format(self.full_name, fragment, replacement)
-            )
+                "{}.replace(fragment={!r}, replacement={!r})".format(
+                    self.full_name, fragment, replacement
+                )
+            ),
         )
 
     def startswith(
-        self,
-        prefix,             # type: str
-        ignore_case=False   # type: bool
-    ):                      # type: (...) -> DeferredRowValue
-
+        self, prefix, ignore_case=False
+    ):  # type: (str, bool) -> DeferredRowValue
         def expression(row):  # type: (Row) -> bool
             val = row[(self.table_name, self.name)] or ""
             if ignore_case:
@@ -558,17 +541,20 @@ class StringField(Field):
             expression=expression,
             data_type=DataType.String,
             description=(
-                "{}.startswith(prefix={!r}, ignore_case={})"
-                .format(self.full_name, prefix, ignore_case)
-            )
+                "{}.startswith(prefix={!r}, ignore_case={})".format(
+                    self.full_name, prefix, ignore_case
+                )
+            ),
         )
 
 
-def unwrap_field_value(row, field):  # type: (Row, ExpressionWrapper) -> Optional[Primitive]
+def unwrap_field_value(
+    row, field
+):  # type: (Row, ExpressionWrapper) -> Optional[Primitive]
     """Get value corresponding to field out of a row"""
-    if field is None:
-        return
-    elif isinstance(field, (bool, datetime.date, datetime.datetime, float, Decimal, float, int, str)):
+    if isinstance(
+        field, (bool, datetime.date, datetime.datetime, float, Decimal, float, int, str)
+    ):
         return field
     elif isinstance(field, Field):
         return row[(field.table_name, field.name)]
